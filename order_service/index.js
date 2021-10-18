@@ -1,5 +1,6 @@
 // TODO: Implement the order service
-var amqp = require('amqplib/callback_api');
+const amqp = require('amqplib/callback_api');
+const fs = require('fs');
 
 const messageBrokerInfo = {
     exchanges: {
@@ -15,28 +16,27 @@ const messageBrokerInfo = {
 }
 
 const createMessageBrokerConnection = () => new Promise((resolve, reject) => {
-    amqp.connect('ampq://localhost', (err, conn) => {
+    amqp.connect('amqp://localhost', (err, conn) => {
         if (err) { reject(err); }
         resolve(conn);
     });
 });
 
+const configureMessageBroker = channel => {
+    const { exchanges, queues, routingKeys } = messageBrokerInfo;
+
+    channel.assertExchange(exchanges.order, 'direct', { durable: true });
+    channel.assertQueue(queues.addQueue, { durable: true });
+    channel.bindQueue(queues.addQueue, exchanges.order, routingKeys.input);
+}
+
 const createChannel = connection => new Promise((resolve, reject) => {
     connection.createChannel((err, channel) => {
-        if(err) { reject(err);}
+        if (err) { reject(err); }
+        configureMessageBroker(channel);
         resolve(channel);
     });
 });
-
-const configureMessageBroker = channel => {
-    const { order } = messageBrokerInfo.exchanges;
-    const { addQueue} = messageBrokerInfo.queues;
-    const { input } = messageBrokerInfo.routingKeys;
-
-    channel.assertExchange(order, 'direct', { durable: true});
-    channel.assertQueue(addQueue, {durable: true});
-    channel.bindQueue(addQueue, order, input);
-};
 
 (async () => {
     const connection = await createMessageBrokerConnection();
